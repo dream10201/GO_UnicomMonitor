@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -30,6 +31,7 @@ type Video struct {
 	ParamMsg string `json:"paramMsg"`
 	Name     string `json:"name"`
 	Size     int    `json:"size"`
+	Count    int    `json:"count"`
 }
 
 // 获取配置
@@ -51,35 +53,24 @@ func GetConfig() Config {
 
 // 删除文件夹下的旧文件
 func DeleteOldFiles(dirPath string, filesToKeep int) {
-	//打开目录
-	dir, err := os.Open(dirPath)
-	if err != nil {
-		FmtPrint("无法打开目录", err)
-		return
-	}
-	defer dir.Close()
-	//读取目录下的所有文件信息
-	files, err := dir.Readdir(-1) //读取所有文件
-	if err != nil {
-		FmtPrint("读取目录失败", err)
-		return
-	}
-	//过滤掉目录，仅保留文件
-	var fileInfos []os.FileInfo
-	for _, file := range files {
-		if !file.IsDir() { //仅保留文件，排除子目录
-			fileInfos = append(fileInfos, file)
+	//读取文件
+	fileInfos := []fs.FileInfo{}
+	filePaths, _ := filepath.Glob(filepath.Join(dirPath, "*"))
+	for _, filePath := range filePaths {
+		info, _ := os.Stat(filePath)
+		if info.Mode().IsRegular() {
+			fileInfos = append(fileInfos, info)
 		}
 	}
-	//如果文件数量小于或等于需要保留的文件数量，则不需要删除
+	//检查文件数量
 	if len(fileInfos) <= filesToKeep {
 		return
 	}
-	//按照文件的修改时间进行排序，最新的排在前面
+	//按时间排序
 	sort.Slice(fileInfos, func(i, j int) bool {
 		return fileInfos[i].ModTime().After(fileInfos[j].ModTime())
 	})
-	//删除最旧的文件，直到只剩下指定数量的文件
+	//删除最旧的文件
 	for i := filesToKeep; i < len(fileInfos); i++ {
 		oldFile := filepath.Join(dirPath, fileInfos[i].Name())
 		_ = os.Remove(oldFile)

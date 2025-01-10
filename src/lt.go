@@ -3,14 +3,16 @@
 import (
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
 
 // 录制
-func GoRecording(ffmpeg *FFmpeg, video *Video) {
+func GoRecording(config *Config, video *Video) {
 	//临时变量
+	ffmpeg := &config.FFmpeg
 	tempPath := video.Name
 	if ffmpeg.Exec != "" {
 		tempPath = video.Name + "/temp"
@@ -21,8 +23,10 @@ func GoRecording(ffmpeg *FFmpeg, video *Video) {
 		bytes := linkServer(video)
 		//检查数据
 		if len(bytes) == 0 {
-			FmtPrint("无法使用的设备：" + video.Name)
-			return
+			FmtPrint(video.Name + "设备连接失败，稍后自动重连(" + strconv.Itoa(config.Sleep) + ")")
+			timeout := time.Duration(config.Sleep)
+			time.Sleep(timeout * time.Second)
+			continue
 		}
 		//文件名称
 		fileName := getFileName(tempPath) + ".flv"
